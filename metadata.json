@@ -1,0 +1,6 @@
+{
+  "name": "Quiniela Mundial 2026",
+  "description": "La mejor plataforma para pronosticar los resultados de la Copa Mundial 2026 y competir con tus amigos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

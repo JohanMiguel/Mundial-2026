@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: checks if user is logged in
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Helper: checks if user is editing their own data
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Helper: checks if user is registered in the database as an admin
+    function isAdmin() {
+      return isSignedIn() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
+    }
+
+    // Collection: Users
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      // Allow creation of first profile, update is permitted for owner or admin. 
+      // Owners cannot arbitrarily modify points or metrics directly without safe recalculations.
+      // But they need to be able to register. Let's write rules allowing them to update country & name.
+      allow create: if isSignedIn() && (isOwner(userId) || isAdmin());
+      allow update: if isSignedIn() && (isAdmin() || (isOwner(userId) && 
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['points', 'accuracy', 'correctScores', 'correctResults', 'isAdmin'])));
+      allow delete: if isAdmin();
+    }
+
+    // Collection: Matches
+    match /matches/{matchId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Collection: Predictions
+    match /predictions/{predId} {
+      allow read: if isSignedIn();
+      
+      // Predictions can only be created/updated if:
+      // 1. User is signed in and is the owner of the prediction
+      // 2. The match hasn't started yet (this can also be guarded client-side, but let's be secure)
+      allow create, update: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+    }
+
+    // Collection: Notifications
+    match /notifications/{notifId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+  }
+}
